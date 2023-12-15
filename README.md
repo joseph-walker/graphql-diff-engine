@@ -1,6 +1,6 @@
 # GQL Diff Engine
 
-Automated regression tool to run a set of GraphQL queries against two different API deployments and diff the outputs.
+Automated regression tool to run a set of GraphQL queries against two different API deployments and diff the responses.
 
 ## Motivation
 
