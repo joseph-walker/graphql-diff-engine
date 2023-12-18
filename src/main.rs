@@ -3,7 +3,7 @@ use diff_engine::*;
 use clap::Parser;
 use colored::Colorize;
 use glob::glob;
-use reqwest::{blocking::Client, header::CONTENT_TYPE};
+use reqwest::{header::CONTENT_TYPE, Client};
 use serde_json::{to_string, Value};
 use similar::TextDiff;
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf};
@@ -21,7 +21,7 @@ struct Cli {
     config: Option<PathBuf>,
 }
 
-fn fetch(
+async fn fetch(
     target: &str,
     query: &String,
     headers: &HashMap<String, String>,
@@ -42,10 +42,10 @@ fn fetch(
         req = req.header(header, value);
     }
 
-    req.send().unwrap().text().unwrap()
+    req.send().await.unwrap().text().await.unwrap()
 }
 
-fn run_diff(config: &Config, target_a: &str, target_b: &str) {
+async fn run_diff(config: &Config, target_a: &str, target_b: &str) {
     for file in glob(&config.query_path).unwrap() {
         let file = file.unwrap();
         let query = read_to_string(&file).unwrap();
@@ -66,8 +66,8 @@ fn run_diff(config: &Config, target_a: &str, target_b: &str) {
         for arg_set in args {
             println!("{border_thin}-");
 
-            let response_a = fetch(target_a, &query, &config.headers, &arg_set);
-            let response_b = fetch(target_b, &query, &config.headers, &arg_set);
+            let response_a = fetch(target_a, &query, &config.headers, &arg_set).await;
+            let response_b = fetch(target_b, &query, &config.headers, &arg_set).await;
 
             let response_a =
                 serde_json::to_string_pretty(&serde_json::from_str::<Value>(&response_a).unwrap())
@@ -86,24 +86,20 @@ fn run_diff(config: &Config, target_a: &str, target_b: &str) {
             println!("{border_thin}-");
 
             let udiff = diff.unified_diff();
-            let udiff = udiff.to_string();
 
-            if udiff.len() == 0 {
-                println!("{}", udiff);
-            } else {
-                println!("No Change");
-            }
+            println!("{}", udiff);
         }
 
         println!("{border_thik}=");
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     let config = read_to_string(cli.config.unwrap_or("./graphql-diff.toml".into())).unwrap();
     let config: Config = toml::from_str(&config).unwrap();
 
-    run_diff(&config, &cli.variant_a, &cli.variant_b);
+    run_diff(&config, &cli.variant_a, &cli.variant_b).await;
 }
